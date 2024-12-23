@@ -19,8 +19,8 @@
                     return;
                 }
 
-                this.lastKnownPosition = null;
-                this.lastKnownRotation = null;
+                this.lastKnownPosition = { x: 0, y: 0, z: 0 };
+                this.lastKnownRotation = { x: 0, y: 0, z: 0 };
                 this.deviceRotation = { alpha: 0, beta: 0, gamma: 0 };
                 this.modelDetached = false;
 
@@ -32,7 +32,7 @@
                     this.modelDetached = false;
                     model.setAttribute('visible', 'true'); // Re-attach the model when the marker is found
                     model.parentElement = marker;
-                    model.object3D.position.copy(marker.object3D.position);                    
+                    model.object3D.position.copy(marker.object3D.position);
                 });
 
                 marker.addEventListener('markerLost', () => {
@@ -44,6 +44,10 @@
 
                 // Listen for device orientation
                 window.addEventListener('deviceorientation', (event) => {
+                    if (!modelDetached) {
+                        return;
+                    }
+
                     this.deviceRotation = {
                         alpha: event.alpha || 0,
                         beta: event.beta || 0,
@@ -51,26 +55,54 @@
                     };
                 });
 
+                window.addEventListener('devicemotion', (event) => {
+                    if (!modelDetached) {
+                        return;
+                    }
+                    const accel = event.acceleration; // Linear acceleration in m/s^2
+                    const deltaTime = event.interval / 1000; // Convert interval to seconds
+
+                    if (accel) {
+                        // Update velocity (v = v0 + a * t)
+                        lastVelocity.x += (accel.x || 0) * deltaTime;
+                        lastVelocity.y += (accel.y || 0) * deltaTime;
+                        lastVelocity.z += (accel.z || 0) * deltaTime;
+
+                        // Update position (s = s0 + v * t + 0.5 * a * t^2)
+                        lastKnownPosition.x += lastVelocity.x * deltaTime + 0.5 * (accel.x || 0) * deltaTime ** 2;
+                        lastKnownPosition.y += lastVelocity.y * deltaTime + 0.5 * (accel.y || 0) * deltaTime ** 2;
+                        lastKnownPosition.z += lastVelocity.z * deltaTime + 0.5 * (accel.z || 0) * deltaTime ** 2;
+
+                        console.log('Updated Position:', lastKnownPosition);
+                    }
+                });
+
                 // Update model position on each frame
                 this.el.sceneEl.addEventListener('tick', () => {
                     const { sensitivity } = this.data;
+                    if (this.modelDetached) {
 
-                    if (this.modelDetached && this.lastKnownPosition) {
-                        // Adjust model's position based on device rotation
-                        const deltaX = this.deviceRotation.gamma * sensitivity;
-                        const deltaZ = this.deviceRotation.beta * sensitivity;
+                        if (this.lastKnownPosition) {
+                            // Adjust model's position based on device rotation
+                            const deltaX = this.deviceRotation.gamma * sensitivity;
+                            const deltaZ = this.deviceRotation.beta * sensitivity;
 
-                        const adjustedPosition = this.lastKnownPosition.clone();
-                        adjustedPosition.x += deltaX;
-                        adjustedPosition.z += deltaZ;
+                            const adjustedPosition = this.lastKnownPosition.clone();
+                            adjustedPosition.x += deltaX;
+                            adjustedPosition.z += deltaZ;
 
-                        model.object3D.position.copy(adjustedPosition);
-                    }
+                            model.object3D.position.copy(adjustedPosition);
+                        }
 
-                    if (this.modelDetached && this.lastKnownRotation) {
-                        // Optionally adjust the rotation of the model based on device orientation
-                        const rotationFactor = this.deviceRotation.alpha * sensitivity;
-                        model.object3D.rotation.y = this.lastKnownRotation.y + rotationFactor;
+                        if (this.lastKnownRotation) {
+                            // Optionally adjust the rotation of the model based on device orientation
+                            const rotationFactor = this.deviceRotation.alpha * sensitivity;
+                            model.object3D.rotation.y = this.lastKnownRotation.y + rotationFactor;
+                        }
+                    } else {
+                        // Re-attach the model to the marker
+                        model.object3D.position.copy(marker.object3D.position);
+                        model.object3D.rotation.copy(marker.object3D.rotation);
                     }
 
                     model.object3D.updateMatrixWorld();
@@ -83,8 +115,8 @@
 <body>
     <a-scene adjust-on-lost embedded arjs="debugUIEnabled: false;" vr-mode-ui="enabled: false">
         <!-- Marker for initialization -->
-        <a-marker id="marker" preset="custom" type="pattern" url="/assets/ar/qr-pattern.patt" smooth="true" preload="true"
-            smoothCount="10" smoothTolerance="0.01" smoothThreshold="2">
+        <a-marker id="marker" preset="custom" type="pattern" url="/assets/ar/qr-pattern.patt" smooth="true"
+            preload="true" smoothCount="10" smoothTolerance="0.01" smoothThreshold="2">
             <!-- Model (will be visible even when marker is lost) -->
             <!-- <a-entity id="model" gltf-model="Pathfinder_2k.glb" scale="1 1 1" position="0 0 0">
             </a-entity> -->
