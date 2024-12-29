@@ -43,27 +43,4 @@
         <a-entity camera></a-entity>
 
     </a-scene>
-
-    <script>
-        window.onload = function () {
-            AFRAME.registerComponent("modelhandler", {
-                init: function () {
-                    const marker = this.el;
-                    this.model = document.querySelector("#model");
-
-                    marker.addEventListener("markerLost", () => {
-                        this.model.setAttribute("visible", true);
-                    });
-
-                },
-                // tick: function () {
-                //     console.log(this.el.object3D.position);
-                //     console.log(this.el.object3D.rotation);
-                //     console.log(this.el.object3D.scale);
-                //     console.log(this.el.object3D.visible);
-                //     console.log(this.el.object3D.children);
-                // }
-            })
-        }
-    </script>
 </body>
