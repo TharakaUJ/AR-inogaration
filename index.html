@@ -29,10 +29,11 @@
         <a-marker id="marker" preset="custom" type="pattern" url="/assets/ar/pattern-Untitled.patt" smooth="true"
             smoothCount="0" smoothTolerance="0.0005" smoothThreshold="1.5" preload="true">
             <!-- Pseudo-object for positioning -->
-            <a-entity id="pseudo-object" geometry="primitive: box; height: 0.1; width: 0.1; depth: 0.1"
-                material="color: red" position="0 0.05 0"></a-entity>
+            <a-entity id="pseudo-object" geometry="primitive: box; height: 0.01; width: 0.01; depth: 0.01"
+                material="color: transparent" position="0 0.05 3"></a-entity>
         </a-marker>
 
+        <a-entity light="type: ambient; color: #404040; intensity: 50"></a-entity>
         <!-- Camera -->
         <a-entity camera></a-entity>
     </a-scene>
@@ -53,9 +54,30 @@
             let mixer; // For animations
             let model; // To store the loaded model
 
+            // Add lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 50); // Soft white light
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 10);
+            directionalLight.position.set(1, 1, 1).normalize();
+            scene.add(directionalLight);
+
             // Load the GLB model
-            loader.load('/assets/ar/ironman_helmet_animation3[1]-baked.glb', (gltf) => {
+            loader.load('/assets/ar/ironman-animation_final-2.glb', (gltf) => {
                 model = gltf.scene;
+
+                // Find the plane sub-structure and add a video texture to it
+                const plane = model.getObjectByName('Plane'); // Adjust the name 'Plane' to match your model's structure
+                if (plane) {
+                    const video = document.createElement('video');
+                    video.src = '/assets/ar/WhatsApp Video 2024-12-30 at 03.38.20.mp4'; // Set the path to your video file
+                    video.load();
+                    video.loop = true;
+                    video.play();
+
+                    const videoTexture = new THREE.VideoTexture(video);
+                    plane.material = new THREE.MeshBasicMaterial({ map: videoTexture });
+                }
                 model.position.set(0, 0.2, 0); // Adjust relative position
                 model.scale.set(0.5, 0.5, 0.5); // Adjust scale if needed
                 scene.add(model);
@@ -65,6 +87,8 @@
                     mixer = new THREE.AnimationMixer(model);
                     gltf.animations.forEach((clip) => {
                         const action = mixer.clipAction(clip);
+                        action.setLoop(THREE.LoopOnce); // Stop looping the animation
+                        action.clampWhenFinished = true; // Keep the last frame when the animation ends
                         action.play();
                     });
                 }
@@ -89,8 +113,20 @@
                     const pseudoPosition = pseudoObject.object3D.position;
                     const pseudoRotation = pseudoObject.object3D.rotation;
 
-                    model.position.copy(pseudoPosition);
-                    model.rotation.copy(pseudoRotation);
+                    // Sensitivity parameters
+                    const positionSensitivity = 0.2; // Adjust this value to change position sensitivity
+                    const rotationSensitivity = 0.2; // Adjust this value to change rotation sensitivity
+
+                    model.position.copy(pseudoPosition).multiplyScalar(positionSensitivity);
+
+                    // Create a new rotation with an additional 90 degrees around the x-axis
+                    const adjustedRotation = new THREE.Euler(
+                        pseudoRotation.x * rotationSensitivity - Math.PI / 2,
+                        pseudoRotation.y * rotationSensitivity + Math.PI,
+                        pseudoRotation.z * rotationSensitivity
+                    );
+
+                    model.rotation.copy(adjustedRotation);
                 }
             }
 
