@@ -27,9 +27,6 @@
 </head>
 
 <body>
-    <!-- Hidden Video Element -->
-    <video id="hidden-video" src="./../assets/ar/WhatsApp Video 2024-12-30 at 03.38.20.mp4" muted loop playsinline autoplay>
-    </video>
 
     <!-- AR.js Scene -->
     <a-scene vr-mode-ui='enabled: false;' embedded arjs='trackingMethod: best;'>
@@ -40,13 +37,10 @@
             <a-entity id="pseudo-object" geometry="primitive: box; height: 0.01; width: 0.01; depth: 0.01"
                 material="color: transparent" position="0 0.05 3"></a-entity>
 
-            <!-- Video Entity -->
-            <a-video id="video-plane" src="#hidden-video" position="0 0 0" rotation="0 0 0" scale="1 1 1"></a-video>
-
         </a-marker>
+        <a-video id="video-plane" src="./../assets/ar/WhatsApp Video 2024-12-30 at 03.38.20.mp4" position="0 0 0"
+            rotation="0 0 0" scale="1 1 1"></a-video>
 
-
-        <a-entity light="type: ambient; color: #404040; intensity: 50"></a-entity>
         <a-entity camera></a-entity>
     </a-scene>
 
@@ -79,6 +73,9 @@
                 // Find the plane object in the model
                 plane = model.getObjectByName('Plane'); // Adjust the name if different in your model
 
+                plane.material.transparent = true;
+                plane.material.opacity = 0.1;
+
                 model.position.set(0, 0, 0); // Adjust relative position
                 model.scale.set(0.2, 0.2, 0.2); // Adjust scale if needed
                 scene.add(model);
@@ -108,19 +105,49 @@
                     mixer.update(delta);
                 }
 
-                // Sync the A-Frame video plane with the model's plane object
-                if (plane && videoPlane) {
-                    const position = new THREE.Vector3();
-                    const rotation = new THREE.Euler();
-                    const scale = new THREE.Vector3();
+                // Update model position based on marker position
+                if (model) {
+                    const pseudoObject = document.querySelector('#pseudo-object');
+                    const pseudoPosition = pseudoObject.object3D.position;
+                    const pseudoRotation = pseudoObject.object3D.rotation;
 
-                    plane.getWorldPosition(position);
-                    plane.getWorldQuaternion(rotation.setFromQuaternion(plane.getWorldQuaternion(new THREE.Quaternion())));
-                    plane.getWorldScale(scale);
+                    // Sensitivity parameters
+                    const positionSensitivity = 0.2; // Adjust this value to change position sensitivity
+                    const rotationSensitivity = 0.2; // Adjust this value to change rotation sensitivity
 
-                    videoPlane.setAttribute('position', `${position.x} ${position.y} ${position.z}`);
-                    videoPlane.setAttribute('rotation', `${THREE.MathUtils.radToDeg(rotation.x)} ${THREE.MathUtils.radToDeg(rotation.y)} ${THREE.MathUtils.radToDeg(rotation.z)}`);
-                    videoPlane.setAttribute('scale', `${scale.x} ${scale.y} ${scale.z}`);
+                    model.position.copy(pseudoPosition).multiplyScalar(positionSensitivity);
+
+                    // Create a new rotation with an additional 90 degrees around the x-axis
+                    const adjustedRotation = new THREE.Euler(
+                        pseudoRotation.x * rotationSensitivity - Math.PI / 2,
+                        pseudoRotation.y * rotationSensitivity + Math.PI,
+                        pseudoRotation.z * rotationSensitivity
+                    );
+
+                    model.rotation.copy(adjustedRotation);
+
+                    // Sync the A-Frame video plane with the model's plane object
+                    if (plane && videoPlane) {
+                        const position = new THREE.Vector3();
+                        const rotation = new THREE.Euler();
+                        const scale = new THREE.Vector3();
+
+                        plane.getWorldPosition(position);
+                        plane.getWorldQuaternion(rotation.setFromQuaternion(plane.getWorldQuaternion(new THREE.Quaternion())));
+                        plane.getWorldScale(scale);
+
+                        videoPlane.setAttribute('position', `${position.x} ${position.y} ${position.z + 0.5}`);
+                        videoPlane.setAttribute('rotation', `${THREE.MathUtils.radToDeg(rotation.x) + 90} ${THREE.MathUtils.radToDeg(rotation.y)} ${-THREE.MathUtils.radToDeg(rotation.z)+180}`);
+                        videoPlane.setAttribute('scale', `${scale.x * 1.8} ${scale.y * 1.8} ${scale.z}`);
+                    }
+                }
+
+                if (marker.object3D.visible) {
+                    videoPlane.setAttribute('visible', true);
+                    videoPlane.play();
+                } else {
+                    videoPlane.setAttribute('visible', false);
+                    videoPlane.pause();
                 }
             }
 
